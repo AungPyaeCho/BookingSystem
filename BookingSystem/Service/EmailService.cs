@@ -4,18 +4,18 @@ namespace BookingSystem.Service
 {
     public class EmailService : IEmailService
     {
-        public Task SendVerificationEmail(string toEmail, string verificationLink)
+        public bool SendVerificationEmail(string toEmail, string verificationLink)
         {
-            Console.WriteLine($"[Mock Email] Sending verification email to: {toEmail}");
+            Console.WriteLine($"[Mock Verification] Auto-completing verification for email: {toEmail}");
             Console.WriteLine($"Verification Link: {verificationLink}");
-            return Task.CompletedTask;
+            return true;
         }
 
-        public Task SendPasswordResetEmail(string toEmail, string resetToken)
+        public bool SendPasswordResetEmail(string toEmail, string resetToken)
         {
-            Console.WriteLine($"[Mock Email] Sending password reset email to: {toEmail}");
+            Console.WriteLine($"[Mock Password Reset] Auto-completing password reset for email: {toEmail}");
             Console.WriteLine($"Password Reset Token: {resetToken}");
-            return Task.CompletedTask;
+            return true;
         }
     }
 }

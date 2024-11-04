@@ -12,6 +12,7 @@ using System.Text;
 
 namespace BookingSystem.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class UserController : ControllerBase
@@ -31,18 +32,36 @@ namespace BookingSystem.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> Register(UserModel userModel)
         {
+            var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.userEmail == userModel.userEmail);
+            if (existingUser != null)
+            {
+                return BadRequest(new { Message = "User with this email already exists." });
+            }
+
             userModel.SetEncryptedPassword(userModel.userPassword!);
+            userModel.isVarify = true;
+
             _context.Users.Add(userModel);
             var result = await _context.SaveChangesAsync();
             if (result > 0)
             {
                 var verificationLink = Url.Action("VerifyEmail", "User", new { userId = userModel.userId }, Request.Scheme)!;
-                await _emailService.SendVerificationEmail(userModel.userEmail!, verificationLink);
-                return Ok(new { Message = "Registration successful, please verify your email." });
+
+                bool emailSent = _emailService.SendVerificationEmail(userModel.userEmail!, verificationLink);
+
+                if (emailSent)
+                {
+                    return Ok(new { Message = "Registration successful, email verification auto-completed for testing." });
+                }
+                else
+                {
+                    return BadRequest(new { Message = "Failed to send verification email." });
+                }
             }
 
             return BadRequest(new { Message = "Registration failed." });
         }
+
 
         [HttpPost("login")]
         [AllowAnonymous]
@@ -64,9 +83,22 @@ namespace BookingSystem.Controllers
         [HttpGet("profile")]
         public async Task<IActionResult> GetProfile()
         {
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null)
+            {
+                return Unauthorized(new { Message = "User not authenticated." });
+            }
+
+            if (!int.TryParse(userIdClaim.Value, out var userId))
+            {
+                return BadRequest(new { Message = "Invalid user ID." });
+            }
+
             var user = await _context.Users.FindAsync(userId);
-            if (user == null) return NotFound(new { Message = "User not found" });
+            if (user == null)
+            {
+                return NotFound(new { Message = "User not found" });
+            }
 
             return Ok(new
             {
@@ -103,10 +135,19 @@ namespace BookingSystem.Controllers
             if (user == null) return NotFound(new { Message = "User not found" });
 
             var resetToken = GenerateResetToken();
-            await _emailService.SendPasswordResetEmail(user.userEmail!, resetToken);
 
-            return Ok(new { Message = "Password reset link has been sent to your email" });
+            bool emailSent = _emailService.SendPasswordResetEmail(user.userEmail!, resetToken);
+
+            if (emailSent)
+            {
+                return Ok(new { Message = "Password reset auto-completed for testing." });
+            }
+            else
+            {
+                return BadRequest(new { Message = "Failed to send password reset email." });
+            }
         }
+
 
         [HttpPost("confirm-reset")]
         [AllowAnonymous]
